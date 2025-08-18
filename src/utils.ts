@@ -166,13 +166,30 @@ export async function checkForNewTerms(): Promise<void> {
   const lastDates = getLastDates();
   const newEvents = await getEvents(encodedParam);
 
-  const filteredEvents = newEvents.filter((event) => {
+
+  // Filter out events already in lastDates
+  let filteredEvents = newEvents.filter((event) => {
     const eventDate = `${event.date}--${event.time}`;
     return !lastDates.includes(eventDate);
   });
 
+  // Further filter: only keep events before the earliest date in lastDates
+  if (lastDates.length > 0) {
+    // Extract dates from lastDates (format: YYYY-MM-DD--HH:MM), filter out undefined/null
+    const lastDatesOnly = lastDates
+      .map((d) => d.split('--')[0])
+      .filter((d): d is string => !!d);
+    if (lastDatesOnly.length > 0) {
+      // Find the earliest date in lastDates
+      const earliestDate = lastDatesOnly.reduce((min, curr) => (curr < min ? curr : min));
+      filteredEvents = filteredEvents.filter((event) => event.date && event.date < earliestDate);
+    }
+  }
+
   if (filteredEvents.length > 0) {
     await notifyAboutNewEvents(filteredEvents);
     updateLastDates(newEvents.map((event) => `${event.date}--${event.time}`));
+  } else {
+    console.log('No new terms found');
   }
 }
