@@ -48,9 +48,16 @@ function decodeParameters(encodedParam: string): any {
 function convertDateToISO(dateStr: string | null) {
   if (!dateStr) return null;
 
-  const match = dateStr.match(/^(\d{2})\. (\d{2})\. (\d{4})$/);
+  const match = dateStr.match(/^(\d{1,2})\. (\d{1,2})\. (\d{4})$/);
   if (!match) throw new Error('Invalid date format');
-  const [, day, month, year] = match;
+  let [, day, month, year] = match;
+
+  if (typeof day === 'undefined' || typeof month === 'undefined' || typeof year === 'undefined') {
+    throw new Error('Invalid date format');
+  }
+
+  if (day.length === 1) day = '0' + day;
+  if (month.length === 1) month = '0' + month;
   return `${year}-${month}-${day}`;
 }
 
@@ -145,7 +152,7 @@ function constructMessage(events: Event[]): string {
   
   const formattedEvents = events
     .filter((event) => event.date && event.time)
-    .map((event, idx) => `${idx + 1}. ${formatDate(event.date)} ob ${event.time}`)
+    .map((event) => `- ${formatDate(event.date)} ob ${event.time}`)
     .join("\n");
 
   const params = decodeParameters(encodedParam);
