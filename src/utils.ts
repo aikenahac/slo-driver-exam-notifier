@@ -6,9 +6,9 @@ import { getLastDates } from './db/get-last-dates';
 const telegramToken = process.env.TELEGRAM_API_TOKEN ?? '';
 export const bot = new TelegramBot(telegramToken, { polling: true });
 
-const TELEGRAM_CHAT_IDS = ['943993004'];
+const TELEGRAM_CHAT_IDS = ['943993004', '7154559188'];
 
-const encodedParam = 'eyJwYWdlIjpbMF0sImZpbHRlcnMiOnsidHlwZSI6WyIxIl0sImNhdCI6WyI2Il0sIml6cGl0bmlDZW50ZXIiOlsiMTgiXSwibG9rYWNpamEiOlsiMjIxIl0sIm9mZnNldCI6WyIwIl0sInNlbnRpbmVsX3R5cGUiOlsib2siXSwic2VudGluZWxfc3RhdHVzIjpbIm9rIl0sImlzX2FqYXgiOlsiMSJdfSwib2Zmc2V0UGFnZSI6bnVsbH0=';
+export const encodedParam = 'eyJwYWdlIjpbMF0sImZpbHRlcnMiOnsidHlwZSI6WyIxIl0sImNhdCI6WyI2Il0sIml6cGl0bmlDZW50ZXIiOlsiMTgiXSwibG9rYWNpamEiOlsiMjIxIl0sIm9mZnNldCI6WyIwIl0sInNlbnRpbmVsX3R5cGUiOlsib2siXSwic2VudGluZWxfc3RhdHVzIjpbIm9rIl0sImlzX2FqYXgiOlsiMSJdfSwib2Zmc2V0UGFnZSI6bnVsbH0=';
 
 /**
  * Sends a Telegram notification
@@ -20,9 +20,9 @@ export async function notifyWithTelegram(body: string): Promise<void> {
       bot.sendMessage(chat, body);
     });
 
-    console.log('Telegram message sent:', body);
+    console.log('[Telegram message sent]:', body);
   } catch (err) {
-    console.error('Telegram send error:', err);
+    console.error('[Telegram send error]:', err);
   }
 }
 
@@ -115,7 +115,7 @@ interface Event {
 /**
  * Poll events repeatedly at interval
  */
-async function getEvents(encodedParam: string): Promise<Array<Event>> {
+export async function getEvents(encodedParam: string): Promise<Array<Event>> {
   const params = decodeParameters(encodedParam);
   const filters = params.filters ?? {};
   const url = buildUrl(baseUrlComputer, filters);
@@ -147,7 +147,7 @@ function formatDate(dateStr: string) {
 }
 
 
-function constructMessage(events: Event[]): string {
+export function constructMessage(events: Event[]): string {
   const header = "Novi termini za glavno vožnjo so na voljo\n";
   
   const formattedEvents = events

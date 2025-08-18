@@ -10,15 +10,13 @@ bot.on('message', (msg: any) => {
   console.log(`Received message from ${chatId}:`, msg.text);
 });
 
-// cron.schedule(
-//   '*/15 * * * *',
-//   async () => {
-//     console.log('Running scheduled term check every 15 minutes');
-//     await checkForNewTerms();
-//   },
-//   {
-//     timezone: 'Europe/Ljubljana',
-//   },
-// );
-
-checkForNewTerms()
+cron.schedule(
+  '*/5 * * * *',
+  async () => {
+    console.log('Running scheduled term check every 5 minutes');
+    await checkForNewTerms();
+  },
+  {
+    timezone: 'Europe/Ljubljana',
+  },
+);

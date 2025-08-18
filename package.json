@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "tmsg": "bun src/test-msg.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
