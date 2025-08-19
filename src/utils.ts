@@ -8,7 +8,8 @@ export const bot = new TelegramBot(telegramToken, { polling: true });
 
 const TELEGRAM_CHAT_IDS = ['943993004', '7154559188'];
 
-export const encodedParam = 'eyJwYWdlIjpbMF0sImZpbHRlcnMiOnsidHlwZSI6WyIxIl0sImNhdCI6WyI2Il0sIml6cGl0bmlDZW50ZXIiOlsiMTgiXSwibG9rYWNpamEiOlsiMjIxIl0sIm9mZnNldCI6WyIwIl0sInNlbnRpbmVsX3R5cGUiOlsib2siXSwic2VudGluZWxfc3RhdHVzIjpbIm9rIl0sImlzX2FqYXgiOlsiMSJdfSwib2Zmc2V0UGFnZSI6bnVsbH0=';
+export const encodedParam =
+  'eyJwYWdlIjpbMF0sImZpbHRlcnMiOnsidHlwZSI6WyIxIl0sImNhdCI6WyI2Il0sIml6cGl0bmlDZW50ZXIiOlsiMTgiXSwibG9rYWNpamEiOlsiMjIxIl0sIm9mZnNldCI6WyIwIl0sInNlbnRpbmVsX3R5cGUiOlsib2siXSwic2VudGluZWxfc3RhdHVzIjpbIm9rIl0sImlzX2FqYXgiOlsiMSJdfSwib2Zmc2V0UGFnZSI6bnVsbH0=';
 
 /**
  * Sends a Telegram notification
@@ -52,7 +53,11 @@ function convertDateToISO(dateStr: string | null) {
   if (!match) throw new Error('Invalid date format');
   let [, day, month, year] = match;
 
-  if (typeof day === 'undefined' || typeof month === 'undefined' || typeof year === 'undefined') {
+  if (
+    typeof day === 'undefined' ||
+    typeof month === 'undefined' ||
+    typeof year === 'undefined'
+  ) {
     throw new Error('Invalid date format');
   }
 
@@ -142,18 +147,17 @@ export async function getEvents(encodedParam: string): Promise<Array<Event>> {
 
 function formatDate(dateStr: string) {
   const currentYear = new Date().getFullYear();
-  const [year, month, day] = dateStr.split("-");
+  const [year, month, day] = dateStr.split('-');
   return `${day}. ${month}. ${year}`.replace(` ${currentYear}`, '');
 }
 
-
 export function constructMessage(events: Event[]): string {
-  const header = "Novi termini za glavno vožnjo so na voljo\n";
-  
+  const header = 'Novi termini za glavno vožnjo so na voljo\n';
+
   const formattedEvents = events
     .filter((event) => event.date && event.time)
     .map((event) => `- ${formatDate(event.date)} ob ${event.time}`)
-    .join("\n");
+    .join('\n');
 
   const params = decodeParameters(encodedParam);
   const filters = params.filters ?? {};
@@ -173,7 +177,6 @@ export async function checkForNewTerms(): Promise<void> {
   const lastDates = getLastDates();
   const newEvents = await getEvents(encodedParam);
 
-
   // Filter out events already in lastDates
   let filteredEvents = newEvents.filter((event) => {
     const eventDate = `${event.date}--${event.time}`;
@@ -188,14 +191,19 @@ export async function checkForNewTerms(): Promise<void> {
       .filter((d): d is string => !!d);
     if (lastDatesOnly.length > 0) {
       // Find the earliest date in lastDates
-      const earliestDate = lastDatesOnly.reduce((min, curr) => (curr < min ? curr : min));
-      filteredEvents = filteredEvents.filter((event) => event.date && event.date < earliestDate);
+      const earliestDate = lastDatesOnly.reduce((min, curr) =>
+        curr < min ? curr : min,
+      );
+      filteredEvents = filteredEvents.filter(
+        (event) => event.date && event.date < earliestDate,
+      );
     }
   }
+  
+  updateLastDates(newEvents.map((event) => `${event.date}--${event.time}`));
 
   if (filteredEvents.length > 0) {
     await notifyAboutNewEvents(filteredEvents);
-    updateLastDates(newEvents.map((event) => `${event.date}--${event.time}`));
   } else {
     console.log('No new terms found');
   }
