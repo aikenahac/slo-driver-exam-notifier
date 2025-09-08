@@ -21,9 +21,9 @@ export async function notifyWithTelegram(body: string): Promise<void> {
       bot.sendMessage(chat, body);
     });
 
-    console.log('[Telegram message sent]:', body);
+    console.log(`[${getLogDate()}] [Telegram message sent]:`, body);
   } catch (err) {
-    console.error('[Telegram send error]:', err);
+    console.error(`[${getLogDate()}] [Telegram send error]:`, err);
   }
 }
 
@@ -140,7 +140,7 @@ export async function getEvents(encodedParam: string): Promise<Array<Event>> {
 
     return events.filter((event) => event.date) as Array<Event>;
   } catch (err) {
-    console.error('Error fetching the URL:', err);
+    console.error(`[${getLogDate()}] Error fetching the URL:`, err);
     return [];
   }
 }
@@ -173,6 +173,29 @@ async function notifyAboutNewEvents(events: Array<Event>): Promise<void> {
   await notifyWithTelegram(message);
 }
 
+export async function invalidateDates(): Promise<void> {
+  const lastDates = getLastDates();
+
+  let validated = [...lastDates];
+
+  if (lastDates.length > 0) {
+    validated = validated.filter((dateTime) => {
+      if (!dateTime) return false;
+
+      const [date] = dateTime.split('--');
+      if (!date) return false;
+
+      const eventDate = new Date(date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      return eventDate > today;
+    });
+  }
+
+  updateLastDates(validated);
+}
+
 export async function checkForNewTerms(): Promise<void> {
   const lastDates = getLastDates();
   const newEvents = await getEvents(encodedParam);
@@ -182,6 +205,8 @@ export async function checkForNewTerms(): Promise<void> {
     const eventDate = `${event.date}--${event.time}`;
     return !lastDates.includes(eventDate);
   });
+
+  updateLastDates(newEvents.map((event) => `${event.date}--${event.time}`));
 
   // Further filter: only keep events before the earliest date in lastDates
   if (lastDates.length > 0) {
@@ -199,12 +224,27 @@ export async function checkForNewTerms(): Promise<void> {
       );
     }
   }
-  
-  updateLastDates(newEvents.map((event) => `${event.date}--${event.time}`));
 
   if (filteredEvents.length > 0) {
     await notifyAboutNewEvents(filteredEvents);
   } else {
-    console.log('No new terms found');
+    console.log(`[${getLogDate()}] No new terms found`);
   }
+}
+
+export function formatLogDate(date: Date): string {
+  const pad = (num: number) => num.toString().padStart(2, "0");
+
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1); // months are 0-indexed
+  const year = date.getFullYear();
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+
+  return `${day}.${month}.${year} @ ${hours}:${minutes}`;
+}
+
+export function getLogDate(): string {
+  const now = new Date();
+  return formatLogDate(now);
 }

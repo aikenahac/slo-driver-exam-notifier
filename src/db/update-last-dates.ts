@@ -1,3 +1,4 @@
+import { getLogDate } from '../utils';
 import { db } from './open';
 
 /**
@@ -14,10 +15,10 @@ export function updateLastDates(dateTimes: Array<string>) {
         [`${Date.now() * index}-${date}`, date],
       );
 
-      console.log(`[DB] Inserted date: ${date}`);
+      console.log(`[${getLogDate()}] [DB] Inserted date: ${date}`);
     });
   } catch (error) {
-    console.error('[DB] Error setting last dates:', error);
+    console.error(`[${getLogDate()}] [DB] Error setting last dates:`, error);
     throw error;
   }
 }

@@ -1,10 +1,10 @@
-import { constructMessage, encodedParam, getEvents, notifyWithTelegram } from "./utils";
+import { constructMessage, encodedParam, getEvents, getLogDate, notifyWithTelegram } from "./utils";
 
 async function testMessages() {
   const events = await getEvents(encodedParam);
   const message = constructMessage(events);
 
-  console.log("[TEST MESSAGE]::", message);
+  console.log(`[${getLogDate()}] [TEST MESSAGE]::`, message);
   await notifyWithTelegram(message);
 }
 
