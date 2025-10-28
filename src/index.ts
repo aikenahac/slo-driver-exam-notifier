@@ -11,11 +11,11 @@ bot.on('message', (msg: any) => {
 });
 
 cron.schedule(
-  '*/5 * * * *',
+  '*/30 * * * *',
   async () => {
     console.log(`[${getLogDate()}] Invalidating dates before today`);
     await invalidateDates();
-    console.log(`[${getLogDate()}] Running scheduled term check every 5 minutes`);
+    console.log(`[${getLogDate()}] Running scheduled term check every 30 minutes`);
     await checkForNewTerms();
   },
   {
