@@ -8,8 +8,10 @@ export const bot = new TelegramBot(telegramToken, { polling: true });
 
 const TELEGRAM_CHAT_IDS = ['943993004', '7154559188'];
 
+// Updated encoded param for new website format
+// {"page":[0],"filters":{"type":["1"],"cat":["6"],"izpitniCenter":["18"],"lokacija":["221"],"calendar_date":["2025-10-28"],"offset":["0"],"sentinel_type":["ok"],"sentinel_status":["ok"],"is_ajax":["1"]},"offsetPage":null}
 export const encodedParam =
-  'eyJwYWdlIjpbMF0sImZpbHRlcnMiOnsidHlwZSI6WyIxIl0sImNhdCI6WyI2Il0sIml6cGl0bmlDZW50ZXIiOlsiMTgiXSwibG9rYWNpamEiOlsiMjIxIl0sIm9mZnNldCI6WyIwIl0sInNlbnRpbmVsX3R5cGUiOlsib2siXSwic2VudGluZWxfc3RhdHVzIjpbIm9rIl0sImlzX2FqYXgiOlsiMSJdfSwib2Zmc2V0UGFnZSI6bnVsbH0=';
+  'eyJwYWdlIjpbMF0sImZpbHRlcnMiOnsidHlwZSI6WyIxIl0sImNhdCI6WyI2Il0sIml6cGl0bmlDZW50ZXIiOlsiMTgiXSwibG9rYWNpamEiOlsiMjIxIl0sImNhbGVuZGFyX2RhdGUiOlsiMjAyNS0xMC0yOCJdLCJvZmZzZXQiOlsiMCJdLCJzZW50aW5lbF90eXBlIjpbIm9rIl0sInNlbnRpbmVsX3N0YXR1cyI6WyJvayJdLCJpc19hamF4IjpbIjEiXX0sIm9mZnNldFBhZ2UiOm51bGx9';
 
 /**
  * Sends a Telegram notification
@@ -28,10 +30,10 @@ export async function notifyWithTelegram(body: string): Promise<void> {
 }
 
 const baseUrlClient =
-  'https://e-uprava.gov.si/si/javne-evidence/prosti-termini';
+  'https://e-uprava.gov.si/si/javne-evidence/prosti-termini-zemljevid.html';
 
 const baseUrlComputer =
-  'https://e-uprava.gov.si/si/javne-evidence/prosti-termini/content/singleton.html';
+  'https://e-uprava.gov.si/si/javne-evidence/prosti-termini-zemljevid/content/singleton.html';
 
 /**
  * Decode Base64 encoded JSON parameters
@@ -97,15 +99,27 @@ function extractDateTime(
   const $ = cheerio.load(htmlContent);
   const events: { date: string | null; time: string }[] = [];
 
-  $('.js_dogodekBox').each((_, box) => {
-    const calendarDiv = $(box).find('.calendarBox');
+  // Find all table rows with class js_dogodekBox js_dicDetailsBtnRow
+  $('.js_dogodekBox.js_dicDetailsBtnRow').each((_, box) => {
+    const $box = $(box);
+
+    // Find the date from the calendarBox div (only in rows with rowspan)
+    const calendarDiv = $box.find('.calendarBox');
     const date = calendarDiv.attr('aria-label')?.trim() || null;
 
-    const spans = $(box).find('span');
-    const time = spans.last().text().trim();
+    // Find the time from the td with data-th="Ura"
+    const time = $box.find('td[data-th="Ura"]').text().trim();
 
-    if (date || time) {
+    if (date && time) {
       events.push({ date, time });
+    } else if (!date && time) {
+      // If no date found in this row, use the date from previous rows
+      // We'll handle this by looking for the last known date
+      const prevCalendar = $box.prevAll('tr').find('.calendarBox').first();
+      const prevDate = prevCalendar.attr('aria-label')?.trim() || null;
+      if (prevDate && time) {
+        events.push({ date: prevDate, time });
+      }
     }
   });
 
@@ -118,31 +132,76 @@ interface Event {
 }
 
 /**
- * Poll events repeatedly at interval
+ * Get the Monday of the current week for a given date
  */
-export async function getEvents(encodedParam: string): Promise<Array<Event>> {
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Format date to YYYY-MM-DD
+ */
+function formatDateToISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Poll events for multiple weeks ahead
+ * Stops when at least 10 events are found or max weeks reached
+ */
+export async function getEvents(encodedParam: string, weeksAhead: number = 20, minEvents: number = 10): Promise<Array<Event>> {
   const params = decodeParameters(encodedParam);
   const filters = params.filters ?? {};
-  const url = buildUrl(baseUrlComputer, filters);
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
+  const allEvents: Array<Event> = [];
+  const today = new Date();
+  const startMonday = getMonday(today);
+
+  // Fetch events for each week
+  for (let week = 0; week < weeksAhead; week++) {
+    const weekDate = new Date(startMonday);
+    weekDate.setDate(startMonday.getDate() + (week * 7));
+
+    const calendarDate = formatDateToISO(weekDate);
+    const weekFilters = { ...filters, calendar_date: calendarDate };
+    const url = buildUrl(baseUrlComputer, weekFilters);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`[${getLogDate()}] HTTP error for week ${week + 1}: ${response.status}`);
+        continue;
+      }
+
+      const htmlContent = await response.text();
+      const eventsRaw = extractDateTime(htmlContent);
+      const events = eventsRaw.map((event) => ({
+        date: convertDateToISO(event.date),
+        time: event.time,
+      }));
+
+      const validEvents = events.filter((event) => event.date) as Array<Event>;
+      allEvents.push(...validEvents);
+
+      console.log(`[${getLogDate()}] Found ${validEvents.length} events for week starting ${calendarDate}`);
+
+      // Stop fetching if we have enough events
+      if (allEvents.length >= minEvents) {
+        console.log(`[${getLogDate()}] Reached ${allEvents.length} events, stopping search`);
+        break;
+      }
+    } catch (err) {
+      console.error(`[${getLogDate()}] Error fetching week ${week + 1}:`, err);
     }
-
-    const htmlContent = await response.text();
-    const eventsRaw = extractDateTime(htmlContent);
-    const events = eventsRaw.map((event) => ({
-      date: convertDateToISO(event.date),
-      time: event.time,
-    }));
-
-    return events.filter((event) => event.date) as Array<Event>;
-  } catch (err) {
-    console.error(`[${getLogDate()}] Error fetching the URL:`, err);
-    return [];
   }
+
+  return allEvents;
 }
 
 function formatDate(dateStr: string) {
@@ -159,9 +218,20 @@ export function constructMessage(events: Event[]): string {
     .map((event) => `- ${formatDate(event.date)} ob ${event.time}`)
     .join('\n');
 
+  // Build URL with hash fragment for new format
   const params = decodeParameters(encodedParam);
   const filters = params.filters ?? {};
-  const url = buildUrl(baseUrlClient, filters);
+
+  // Remove dynamic fields that shouldn't be in the client URL
+  const { calendar_date, offset, is_ajax, sentinel_type, sentinel_status, ...staticFilters } = filters;
+
+  // Create clean params object for client URL
+  const clientParams = {
+    filters: staticFilters
+  };
+  const clientEncodedParam = Buffer.from(JSON.stringify(clientParams)).toString('base64');
+  const url = `${baseUrlClient}?lang=si#${clientEncodedParam}`;
+
   const footer = `\n\nPoglej si več: ${url}`;
 
   return `${header}\n${formattedEvents}${footer}`;
