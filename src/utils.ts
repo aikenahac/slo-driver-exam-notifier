@@ -210,13 +210,50 @@ function formatDate(dateStr: string) {
   return `${day}. ${month}. ${year}`.replace(` ${currentYear}`, '');
 }
 
+/**
+ * Convert time string (HH:MM) to minutes for sorting
+ */
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  if (!hours || !minutes) {
+    return 0;
+  }
+  if (isNaN(hours) || isNaN(minutes)) {
+    return 0;
+  }
+
+  return hours * 60 + minutes;
+}
+
 export function constructMessage(events: Event[]): string {
   const header = 'Novi termini za glavno vožnjo so na voljo\n';
 
-  const formattedEvents = events
+  // Group events by date
+  const eventsByDate = new Map<string, string[]>();
+  events
     .filter((event) => event.date && event.time)
-    .map((event) => `- ${formatDate(event.date)} ob ${event.time}`)
-    .join('\n');
+    .forEach((event) => {
+      if (!eventsByDate.has(event.date)) {
+        eventsByDate.set(event.date, []);
+      }
+      eventsByDate.get(event.date)!.push(event.time);
+    });
+
+  // Sort dates and format
+  const sortedDates = Array.from(eventsByDate.keys()).sort();
+  const formattedEvents = sortedDates.map((date) => {
+    // Sort times properly by converting to minutes
+    const times = eventsByDate.get(date)!.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+    const count = times.length;
+
+    if (count === 1) {
+      return `- ${formatDate(date)} ob ${times[0]}`;
+    } else {
+      const earliestTime = times[0];
+      const latestTime = times[times.length - 1];
+      return `- ${formatDate(date)} (${count}) (${earliestTime} - ${latestTime})`;
+    }
+  }).join('\n');
 
   // Build URL with hash fragment for new format
   const params = decodeParameters(encodedParam);
